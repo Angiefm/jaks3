@@ -23,16 +23,14 @@ streamlit>=1.28.0
 python-dotenv>=1.0.0
 tqdm>=4.65.0
 
-# Procesamiento de imágenes
+
 Pillow>=10.0.0
-
-# HTTP requests para API de Hugging Face
+opencv-python>=4.8.0
 requests>=2.31.0
-
-# Visualización (ya las tenías parcialmente)
 plotly>=5.17.0
 
-# Opcional: Si quieres usar diffusers localmente en el futuro
-# diffusers>=0.21.0
-# torch>=2.0.0
-# accelerate>=0.20.0
+
+hdbscan>=0.8.33
+umap-learn>=0.5.4
+
+google-generativeai>=0.3.0
