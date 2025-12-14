@@ -85,7 +85,9 @@ class AdvancedImageGenerator:
                     'generation': gen_result,
                     'validation': validation,
                     'attempt': attempts,
-                    'style_config': style_config
+                    'style_config': style_config,
+                    'path': str(Path(gen_result['path']).resolve()),
+                    'prompt': prompt
                 }
             
             # si paso validacion, termino
@@ -109,7 +111,8 @@ class AdvancedImageGenerator:
         
         return best_result or {
             'success': False,
-            'error': 'no se pudo generar ninguna imagen'
+            'error': 'no se pudo generar ninguna imagen',
+            'path': None
         }
     
     def generate_variations(self,
@@ -157,7 +160,8 @@ class AdvancedImageGenerator:
             available = self.style_controller.list_presets()
             return {
                 'success': False,
-                'error': f"preset invalido. disponibles: {available}"
+                'error': f"preset invalido. disponibles: {available}",
+                'path': None
             }
         
         return self.generate_with_quality_check(technical_concept, preset_config)
@@ -210,31 +214,32 @@ class AdvancedImageGenerator:
         if not result.get('success'):
             return f"generacion fallida: {result.get('error', 'unknown error')}"
         
-        gen = result['generation']
-        val = result['validation']
+        gen = result.get('generation', {})
+        val = result.get('validation', {})
         style = result.get('style_config')
         
         report = f"""
 generacion exitosa
 
-archivo: {gen['path']}
+archivo: {result.get('path', 'n/a')}
 estilo: {style.diagram_type.value if style else 'auto'} - {style.color_scheme.value if style else 'n/a'}
-intentos: {result['attempt']}
+intentos: {result.get('attempt', 1)}
 
 calidad
-  score global: {val['global_score']:.2%}
-  estado: {'aprobada' if val['passed'] else 'aceptable'}
+  score global: {val.get('global_score', 0):.2%}
+  estado: {'aprobada' if val.get('passed') else 'aceptable'}
 
   metricas:
-    nitidez: {val['scores']['sharpness']:.2%}
-    claridad tecnica: {val['scores']['technical_clarity']:.2%}
-    contraste: {val['scores']['contrast']:.2%}
-    brillo: {val['scores']['brightness']:.2%}
-    composicion: {val['scores']['composition']:.2%}
+    nitidez: {val.get('scores', {}).get('sharpness', 0):.2%}
+    claridad tecnica: {val.get('scores', {}).get('technical_clarity', 0):.2%}
+    contraste: {val.get('scores', {}).get('contrast', 0):.2%}
+    brillo: {val.get('scores', {}).get('brightness', 0):.2%}
+    composicion: {val.get('scores', {}).get('composition', 0):.2%}
 
 recomendaciones:
 """
-        for rec in val['recommendations']:
+        for rec in val.get('recommendations', []):
             report += f"  - {rec}\n"
         
         return report.strip()
+    

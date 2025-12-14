@@ -1,12 +1,17 @@
+from src.cross_modal.cross_modal_coordinator import CrossModalCoordinator
+from src.image_generation.advanced_image_generator import AdvancedImageGenerator
+
 import streamlit as st
 import sys
 from pathlib import Path
+
 st.set_page_config(
     page_title="Java API Knowledge System",
     page_icon="☕",
     layout="wide",
     initial_sidebar_state="expanded"
 )
+
 st.markdown("""
 <style>
     .stApp {
@@ -169,10 +174,9 @@ def show_home():
         st.info("Sistema inicializándose...")
 
 def show_chat():
-    """Página de chat RAG"""
+    """Página de chat RAG con integración cross-modal"""
     sys.path.append(str(Path(__file__).parent.parent / "src"))
     
-    # Importa el módulo de chat existente
     import os
     from dotenv import load_dotenv
     import random
@@ -185,22 +189,34 @@ def show_chat():
     from chat.rag_engine import RAGEngine
     
     st.markdown('<h1 class="main-header">💬 Chat con Documentación Java/Spring</h1>', unsafe_allow_html=True)
-    
-    # Inicialización
+
     @st.cache_resource
-    def init_chat_components():
+    def init_cross_modal_components():
         vector_store = VectorStore()
         embedding_engine = EmbeddingEngine()
         search_engine = SemanticSearch(vector_store, embedding_engine)
         rag_engine = RAGEngine(search_engine, api_key=os.getenv("GEMINI_API_KEY"))
-        return vector_store, search_engine, rag_engine
+
+        image_generator = AdvancedImageGenerator(
+            api_key=os.getenv("STABILITY_API_KEY"),
+            output_dir="data/generated_images"
+        )
+
+        coordinator = CrossModalCoordinator(rag_engine, image_generator)
+
+        return coordinator
     
-    vector_store, search_engine, rag_engine = init_chat_components()
+    coordinator = init_cross_modal_components()
     
     # Sidebar
     with st.sidebar:
         st.markdown("### ⚙️ Configuración")
         top_k = st.slider("Documentos a consultar", 1, 10, 3)
+        
+        # botón para limpiar historial
+        if st.button("🗑️ Limpiar Historial", use_container_width=True):
+            st.session_state.messages = []
+            st.rerun()
     
     # Mensajes
     if "messages" not in st.session_state:
@@ -208,10 +224,27 @@ def show_chat():
     
     CUTE_EMOJIS = ["🦄", "🌸", "🎀", "🌙", "💝", "🧸", "🍓", "🦋"]
     
+    # Renderizar historial de mensajes
     for message in st.session_state.messages:
         avatar = message.get("avatar", "✨" if message["role"] == "assistant" else random.choice(CUTE_EMOJIS))
         with st.chat_message(message["role"], avatar=avatar):
             st.markdown(message["content"])
+            
+            if message.get("image_path"):
+                try:
+                    image_path = Path(message["image_path"])
+                    if image_path.exists():
+                        st.image(str(image_path), caption="Diagrama generado", use_column_width=True)
+                    else:
+                        st.error(f"Imagen no encontrada: {message['image_path']}")
+                except Exception as e:
+                    st.error(f"Error al cargar imagen: {e}")
+            
+            if message.get("sources"):
+                st.markdown("---")
+                st.markdown("**Fuentes:**")
+                for source in message["sources"]:
+                    st.markdown(f'🔗 {source["title"]} (similaridad: {source["score"]:.2f})')
     
     if prompt := st.chat_input("Pregunta sobre Java/Spring Boot"):
         user_emoji = random.choice(CUTE_EMOJIS)
@@ -227,24 +260,44 @@ def show_chat():
         
         with st.chat_message("assistant", avatar="✨"):
             with st.spinner("Generando respuesta..."):
-                result = rag_engine.generate_answer(prompt, top_k=top_k)
+                result = coordinator.process_cross_modal_query(prompt, top_k=top_k)
                 
-                st.markdown(result["answer"])
+                if result.get("text_answer"):
+                    st.markdown(result["text_answer"])
+                elif result.get("modality") == "image_only":
+                    st.info("📊 He generado un diagrama visual para tu pregunta:")
+
+                if result.get("image_generated") and result.get("image_path"):
+                    try:
+                        image_path = Path(result["image_path"])
+                        
+                        if image_path.exists():
+                            absolute_path = image_path.resolve()
+                            st.image(str(absolute_path), caption="Diagrama generado", use_column_width=True)
+                        else:
+                            st.error(f"La imagen se generó pero no se encuentra en: {image_path}")
+                            st.info("Verifica que la carpeta 'data/generated_images/' exista")
+                    except Exception as e:
+                        st.error(f" Error al mostrar la imagen: {str(e)}")
+                        st.code(f"Ruta de imagen: {result.get('image_path')}")
                 
-                if result["sources"]:
+                # Mostrar fuentes si existen
+                if result.get("sources"):
                     st.markdown("---")
                     st.markdown("**Fuentes:**")
                     for source in result["sources"]:
                         st.markdown(f'🔗 {source["title"]} (similaridad: {source["score"]:.2f})')
                 
+                assistant_content = result["text_answer"] if result.get("text_answer") else "📊 Diagrama generado"
                 st.session_state.messages.append({
                     "role": "assistant",
-                    "content": result["answer"]
+                    "content": assistant_content,
+                    "image_path": result.get("image_path"),  # Guardar ruta completa
+                    "sources": result.get("sources", [])
                 })
 
 def show_image_generation():
     """Página de generación de imágenes"""
-    # Importa el módulo de generación de imágenes
     from ui.pages.image_generation_page import main as image_gen_main
     image_gen_main()
 

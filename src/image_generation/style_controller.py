@@ -128,8 +128,12 @@ class StyleController:
         Construye negative prompt específico según configuración.
         """
         negative = [
-            "blurry", "low quality", "distorted", "messy",
-            "unclear", "chaotic", "unprofessional"
+            "distorted text", "garbled text", "unreadable text", 
+            "mixed languages", "random characters", "corrupted letters",
+            "blurry text", "overlapping text", "scrambled words",
+            "nonsense text", "gibberish", "mangled typography",
+            "photo", "photograph", "realistic", "3d render",
+            "low quality", "blurry", "pixelated", "watermark"
         ]
 
         if style_config.diagram_type in [DiagramType.UML_CLASS, DiagramType.ER_DIAGRAM]:
