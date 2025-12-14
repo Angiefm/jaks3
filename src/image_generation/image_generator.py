@@ -1,6 +1,7 @@
 import logging
 import requests
 import base64
+from src.filters.content_filter import ContentFilter  
 from typing import Dict, Optional, List
 from pathlib import Path
 import time
@@ -23,6 +24,7 @@ class ImageGenerator:
             "infographic": "technical infographic, modern design, clear typography, professional colors"
         }
         self.logger.info("ImageGenerator (Stability AI) inicializado correctamente")
+        self.content_filter = ContentFilter()
     def text_to_prompt(self, technical_query: str, style: str = "diagram") -> str:
         technical_keywords = self._extract_technical_keywords(technical_query)
         style_suffix = self.style_templates.get(style, self.style_templates["diagram"])
@@ -63,9 +65,21 @@ class ImageGenerator:
                       prompt: str, 
                       negative_prompt: Optional[str] = None,
                       save_path: Optional[str] = None) -> Dict:
+        
+        filter_result = self.content_filter.validate_prompt(prompt)
+        if not filter_result.allowed:
+            self.logger.warning(f"Prompt bloqueado {filter_result.reason}")
+            return {
+                "success": False,
+                "error":f"contenido no permitido: {filter_result.reason}",
+                "path" : None,
+            }
+
+        clean_prompt = self.content_filter.sanitize_prompt(prompt)
+
         if negative_prompt is None:
             negative_prompt = "blurry, low quality, distorted, ugly, bad anatomy, text watermark"
-        self.logger.info(f"Generando imagen con prompt: {prompt[:50]}...")
+        self.logger.info(f"Generando imagen con prompt: {clean_prompt[:50]}...")
         try:
             payload = {
                 "text_prompts": [

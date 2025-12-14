@@ -1,6 +1,7 @@
 import logging
 from typing import Dict
 import google.generativeai as genai
+from src.filters.content_filter import ContentFilter  
 
 class RAGEngine:
     """Motor de generación de respuestas usando RAG con Gemini"""
@@ -10,8 +11,18 @@ class RAGEngine:
         genai.configure(api_key=api_key)
         self.model = genai.GenerativeModel('models/gemini-2.5-flash')
         self.logger = logging.getLogger(__name__)
+        self.content_filter = ContentFilter()
     
     def generate_answer(self, query: str, top_k: int = 3) -> Dict:
+
+        filter_result = self.content_filter.validate_prompt(query)
+        if not filter_result.allowed:
+            return {
+                'answer': "no puedo procesar esta solicitud debido a contenido inapropiado",
+                'sources': [],
+                'blocked': True
+            }
+        
         """Genera respuesta basada en documentos"""
         self.logger.info(f"Consulta: {query}")
         

@@ -261,6 +261,11 @@ def show_chat():
         with st.chat_message("assistant", avatar="✨"):
             with st.spinner("Generando respuesta..."):
                 result = coordinator.process_cross_modal_query(prompt, top_k=top_k)
+
+                if result.get('filter_blocked'):
+                    st.error("contenido bloqueado")
+                    st.warning(result.get('filter_reason', 'la consulta contiene contenido inapropiado'))
+                    st.stop()
                 
                 if result.get("text_answer"):
                     st.markdown(result["text_answer"])
